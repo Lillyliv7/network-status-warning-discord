@@ -33,6 +33,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // get file size and allocate buffer
     fseek(fptr, 0L, SEEK_END);
     long filesize = ftell(fptr);
 
@@ -42,9 +43,9 @@ int main(int argc, char *argv[]) {
         printf("error allocating %ld byte buffer to read file", filesize+500);
         return 1;
     }
-
     rewind(fptr);
 
+    // read settings file into buffer
     size_t bytesRead = fread(settings_file_buf, 1, filesize, fptr);
     if (bytesRead != filesize) {
         perror("Error reading file");
@@ -77,6 +78,8 @@ int main(int argc, char *argv[]) {
 
     list_ip *ip_list = malloc(sizeof(list_ip) * ip_count);
 
+    // create array of ips and data to loop through in main loop to prevent
+    // proccessing data multiple times for no reason
     for (int i = 0; i < ip_count; i++) {
         ip_list[i].dead = false;
         char **ip_arr;
@@ -84,21 +87,28 @@ int main(int argc, char *argv[]) {
         printf("%s@%s\n", ip_arr[0], ip_arr[1]);
         ip_list[i].host = ip_arr[0];
         ip_list[i].ip = ip_arr[1];
+        free(ip_arr);
     }
+
+    puts("main loop starting");
 
     for(;;) {
         for (int i = 0; i < ip_count; i++) {
             char *message = malloc(500);
             bool ping_succeeded = ping(ip_list[i].ip);
 
+            // if the ping did not succeed and we havent already warned of an outage, send a message to alert server dead
             if (ping_succeeded == false && ip_list[i].dead == false) {
                 sprintf(message, settings_array[2], ip_list[i].host, ip_list[i].ip, settings_array[1]);
+                puts(message);
                 send_discord_message(webhook_url, message);
                 ip_list[i].dead = true;
             }
             
+            // if the ping succeeded but we have reported the server as down, send a message to alert server alive
             else if (ping_succeeded == true && ip_list[i].dead == true) {
                 sprintf(message, settings_array[3], ip_list[i].host, ip_list[i].ip, settings_array[1]);
+                puts(message);
                 send_discord_message(webhook_url, message);
                 ip_list[i].dead = false;
             }
