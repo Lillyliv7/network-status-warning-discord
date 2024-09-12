@@ -1,3 +1,7 @@
+# make build directories
+mkdir build
+mkdir build/object
+
 # make objects
 gcc -c -o build/object/main.o src/main.c -lcurl
 gcc -c -o build/object/discord.o src/discord.c -lcurl
