@@ -4,6 +4,8 @@ The program regularly pings every server in your servers list and if one times o
 then it sends a ping over your discord websocket notifying you with the ip and a custom nickname. It sends another ping when the
 server comes back online.
 
+The program was built for Linux but also likely compiles for most unix based systems.
+
 It was written in C without many protections so exposing your config file to the internet isn't
 safe although with normal use it shouldn't be possible to compromise.
 

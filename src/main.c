@@ -10,6 +10,7 @@
 #include "discord.h"
 #include "ping.h"
 #include "strsplit.h"
+#include "define.h"
 
 struct list_ip{
     bool dead;
@@ -18,11 +19,13 @@ struct list_ip{
 };
 typedef struct list_ip list_ip;
 
-
 int main(int argc, char *argv[]) {
-
     if (argc == 1) {
-        printf("Error no IP list file specified\nUsage: disc-serv-stat-alert ./settings.txt\n");
+        puts("Error no settings file specified\nUsage: disc-serv-stat-alert ./settings.txt");
+        return 1;
+    }
+    if (argc > 2) {
+        puts("Error too many arguments specified\nUsage: disc-serv-stat-alert ./settings.txt");
         return 1;
     }
 
@@ -37,10 +40,10 @@ int main(int argc, char *argv[]) {
     fseek(fptr, 0L, SEEK_END);
     long filesize = ftell(fptr);
 
-    char* settings_file_buf = malloc(filesize + 500);
+    char* settings_file_buf = malloc(filesize);
 
     if (settings_file_buf == NULL) {
-        printf("error allocating %ld byte buffer to read file", filesize+500);
+        printf("error allocating %ld byte buffer to read file", filesize);
         return 1;
     }
     rewind(fptr);
@@ -66,15 +69,14 @@ int main(int argc, char *argv[]) {
     char **settings_array;
 
     settings_array = str_split(settings_file_buf, '~');
+    free(settings_file_buf);
 
     // set discord values from settings
-    char *webhook_url = settings_array[0];
-    char *discord_id = settings_array[1];
+    char *webhook_url = settings_array[SETTINGS_WEBHOOK_POS];
+    char *discord_id = settings_array[SETTINGS_ID_POS];
 
-    unsigned int ip_count = atoi(settings_array[4]);
+    unsigned int ip_count = atoi(settings_array[SETTINGS_IP_COUNT_POS]);
     printf("%d\n", ip_count);
-
-    bool dead = false;
 
     list_ip *ip_list = malloc(sizeof(list_ip) * ip_count);
 
@@ -83,7 +85,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < ip_count; i++) {
         ip_list[i].dead = false;
         char **ip_arr;
-        ip_arr = str_split(settings_array[i+5], '@');
+        ip_arr = str_split(settings_array[i+SETTINGS_HOSTS_POS], '@');
         printf("%s@%s\n", ip_arr[0], ip_arr[1]);
         ip_list[i].host = ip_arr[0];
         ip_list[i].ip = ip_arr[1];
@@ -99,7 +101,7 @@ int main(int argc, char *argv[]) {
 
             // if the ping did not succeed and we havent already warned of an outage, send a message to alert server dead
             if (ping_succeeded == false && ip_list[i].dead == false) {
-                sprintf(message, settings_array[2], ip_list[i].host, ip_list[i].ip, settings_array[1]);
+                sprintf(message, settings_array[SETTINGS_DIE_STRING_POS], ip_list[i].host, ip_list[i].ip, settings_array[SETTINGS_ID_POS]);
                 puts(message);
                 send_discord_message(webhook_url, message);
                 ip_list[i].dead = true;
@@ -107,7 +109,7 @@ int main(int argc, char *argv[]) {
             
             // if the ping succeeded but we have reported the server as down, send a message to alert server alive
             else if (ping_succeeded == true && ip_list[i].dead == true) {
-                sprintf(message, settings_array[3], ip_list[i].host, ip_list[i].ip, settings_array[1]);
+                sprintf(message, settings_array[SETTINGS_ALIVE_STRING_POS], ip_list[i].host, ip_list[i].ip, settings_array[SETTINGS_ID_POS]);
                 puts(message);
                 send_discord_message(webhook_url, message);
                 ip_list[i].dead = false;
@@ -116,7 +118,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    free(settings_file_buf);
     free(ip_list);
 
     return 0;
