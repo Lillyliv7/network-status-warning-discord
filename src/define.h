@@ -1,5 +1,12 @@
 #pragma once
 
+struct list_ip{
+    bool dead;
+    char *ip;
+    char *host;
+};
+typedef struct list_ip list_ip;
+
 #define SETTINGS_WEBHOOK_POS 0
 #define SETTINGS_ID_POS 1
 #define SETTINGS_DIE_STRING_POS 2

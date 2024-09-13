@@ -9,16 +9,18 @@ The program was built for Linux but also likely compiles for most unix based sys
 It was written in C without many protections so exposing your config file to the internet isn't
 safe although with normal use it shouldn't be possible to compromise.
 
+Supports ICMP pinging a host (syntax <host>@192.168.1.4) and "pinging" specific ports (syntax <host>@192.168.1.4:80) seemlessly.
+
 Example usage:
 <path-to-exe> settings.txt
 
 Example settings file:
 
-<discord webhook url here>~<@582273277544759296>~%s is dead %s~%s is alive %s~2~Raspberry pi 5@192.168.4.77~IMac@192.168.4.73
+<discord webhook url here><@582273277544759296>~%s@%s is dead %s~%s@%s is alive %s~5~Raspberry pi 5@192.168.4.77~IMac@192.168.4.73~test@255.255.255.254~testssh@255.255.255.254:22~pissh@192.168.4.77:22~
 
 the webhook url is censored here.
 
-The settings file is an array of strings seperated by a '~' symbol.
+The settings file is an array of strings seperated by a '~' symbol, must be terminated with another '~'.
 
 The 1st item is the discord webhook url
 The 2nd item is your discord id surrounded by <@ > to ping you\

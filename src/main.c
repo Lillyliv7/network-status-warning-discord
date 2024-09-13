@@ -11,15 +11,10 @@
 #include "ping.h"
 #include "strsplit.h"
 #include "define.h"
+#include "settings_file.h"
+#include "socket_ping.h"
 
-struct list_ip{
-    bool dead;
-    char *ip;
-    char *host;
-};
-typedef struct list_ip list_ip;
-
-int main(int argc, char *argv[]) {
+int check_args(int argc, char *argv[]) {
     if (argc == 1) {
         puts("Error no settings file specified\nUsage: disc-serv-stat-alert ./settings.txt");
         return 1;
@@ -28,47 +23,29 @@ int main(int argc, char *argv[]) {
         puts("Error too many arguments specified\nUsage: disc-serv-stat-alert ./settings.txt");
         return 1;
     }
+    return 0;
+}
 
-    FILE *fptr;
-    fptr = fopen(argv[1], "r");
-    if(fptr == NULL) {
-        puts("invalid settings file");
-        return 1;
-    }
+int main(int argc, char *argv[]) {
 
-    // get file size and allocate buffer
-    fseek(fptr, 0L, SEEK_END);
-    long filesize = ftell(fptr);
+    // int result = check_ip_port("192.168.4.77", 23);
 
-    char* settings_file_buf = malloc(filesize);
+    // if (result == 1) {
+    //     printf("Connection successful: %s:%d is accepting connections.\n","192.168.4.77", 22);
+    // } else {
+    //     printf("Connection failed: %s:%d is not accepting connections.\n","192.168.4.77", 22);
+    // }
 
-    if (settings_file_buf == NULL) {
-        printf("error allocating %ld byte buffer to read file", filesize);
-        return 1;
-    }
-    rewind(fptr);
+    if(check_args(argc, argv) != 0) return 1;
 
-    // read settings file into buffer
-    size_t bytesRead = fread(settings_file_buf, 1, filesize, fptr);
-    if (bytesRead != filesize) {
-        perror("Error reading file");
-        free(settings_file_buf);
-        fclose(fptr);
-        return 1;
-    }
-
-    fclose(fptr);
-
-    puts(settings_file_buf);
-
-    // settings file data is now in settings_file_buf
-
+    char* settings_file_buf = read_settings_file(argv[1]);
+    if (settings_file_buf == NULL) return 1;
 
     // handle settings file
     // split settings array
     char **settings_array;
-
     settings_array = str_split(settings_file_buf, '~');
+    
     free(settings_file_buf);
 
     // set discord values from settings
@@ -97,7 +74,21 @@ int main(int argc, char *argv[]) {
     for(;;) {
         for (int i = 0; i < ip_count; i++) {
             char *message = malloc(500);
-            bool ping_succeeded = ping(ip_list[i].ip);
+            bool ping_succeeded;
+            // icmp ping if no port specified, socket connect if port specified
+            if (strchr(ip_list[i].ip, ':') != NULL) {
+                // port specified
+                int ip_len = strlen(ip_list[i].ip);
+                char *inp_ip = malloc(ip_len);
+                memcpy(inp_ip,ip_list[i].ip,ip_len);
+
+                char** port_ip_arr = str_split(inp_ip, ':');
+                ping_succeeded = check_ip_port(port_ip_arr[0], atoi(port_ip_arr[1]), 1);
+                free(inp_ip);
+            } else {
+                // port not specified
+                ping_succeeded = ping(ip_list[i].ip);
+            }
 
             // if the ping did not succeed and we havent already warned of an outage, send a message to alert server dead
             if (ping_succeeded == false && ip_list[i].dead == false) {
@@ -106,7 +97,7 @@ int main(int argc, char *argv[]) {
                 send_discord_message(webhook_url, message);
                 ip_list[i].dead = true;
             }
-            
+
             // if the ping succeeded but we have reported the server as down, send a message to alert server alive
             else if (ping_succeeded == true && ip_list[i].dead == true) {
                 sprintf(message, settings_array[SETTINGS_ALIVE_STRING_POS], ip_list[i].host, ip_list[i].ip, settings_array[SETTINGS_ID_POS]);
@@ -114,7 +105,7 @@ int main(int argc, char *argv[]) {
                 send_discord_message(webhook_url, message);
                 ip_list[i].dead = false;
             }
-            sleep(2);
+            sleep(4);
         }
     }
 
