@@ -26,16 +26,27 @@ int check_args(int argc, char *argv[]) {
     return 0;
 }
 
+char* webhook_url = 0;
+char* ping_id = 0;
+
+struct server {
+    char* name;
+    char* ip;
+    int port;
+    bool portSpecified;
+    bool prevOnline;
+}; typedef struct server server_t;
+
+server_t* servers;
+size_t elems_in_servers_arr = 0;
+size_t curr_sizeof_servers = 0;
+
+const char* discordOnlineMsg = "<@%s> ALERT SERVER %s@%s:%d IS NOW ONLINE";
+const char* discordOfflineMsg = "<@%s> ALERT SERVER %s@%s:%d IS NOW OFFLINE";
+
 int main(int argc, char *argv[]) {
-
-    // int result = check_ip_port("192.168.4.77", 23);
-
-    // if (result == 1) {
-    //     printf("Connection successful: %s:%d is accepting connections.\n","192.168.4.77", 22);
-    // } else {
-    //     printf("Connection failed: %s:%d is not accepting connections.\n","192.168.4.77", 22);
-    // }
-
+    // int result = check_ip_port("192.168.4.77", 5863, 5);
+    // printf("%d\n", result);
     if(check_args(argc, argv) != 0) return 1;
 
     char* settings_file_buf = read_settings_file(argv[1]);
@@ -44,72 +55,120 @@ int main(int argc, char *argv[]) {
     // handle settings file
     // split settings array
     char **settings_array;
-    settings_array = str_split(settings_file_buf, '~');
+    settings_array = str_split(settings_file_buf, '\n');
+
+    // allocate space for 10 servers
+    servers = malloc(sizeof(server_t)*10);
+    if(!servers) {
+        printf("ERROR COULD NOT ALLOCATE %ld BYTES\n", sizeof(server_t)*10);
+        return 1;
+    }
+    curr_sizeof_servers = 10;
     
-    free(settings_file_buf);
-
-    // set discord values from settings
-    char *webhook_url = settings_array[SETTINGS_WEBHOOK_POS];
-    char *discord_id = settings_array[SETTINGS_ID_POS];
-
-    unsigned int ip_count = atoi(settings_array[SETTINGS_IP_COUNT_POS]);
-    printf("%d\n", ip_count);
-
-    list_ip *ip_list = malloc(sizeof(list_ip) * ip_count);
-
-    // create array of ips and data to loop through in main loop to prevent
-    // proccessing data multiple times for no reason
-    for (int i = 0; i < ip_count; i++) {
-        ip_list[i].dead = false;
-        char **ip_arr;
-        ip_arr = str_split(settings_array[i+SETTINGS_HOSTS_POS], '@');
-        printf("%s@%s\n", ip_arr[0], ip_arr[1]);
-        ip_list[i].host = ip_arr[0];
-        ip_list[i].ip = ip_arr[1];
-        free(ip_arr);
-    }
-
-    puts("main loop starting");
-
-    for(;;) {
-        for (int i = 0; i < ip_count; i++) {
-            char *message = malloc(500);
-            bool ping_succeeded;
-            // icmp ping if no port specified, socket connect if port specified
-            if (strchr(ip_list[i].ip, ':') != NULL) {
-                // port specified
-                int ip_len = strlen(ip_list[i].ip);
-                char *inp_ip = malloc(ip_len);
-                memcpy(inp_ip,ip_list[i].ip,ip_len);
-
-                char** port_ip_arr = str_split(inp_ip, ':');
-                ping_succeeded = check_ip_port(port_ip_arr[0], atoi(port_ip_arr[1]), 1);
-                free(inp_ip);
-            } else {
-                // port not specified
-                ping_succeeded = ping(ip_list[i].ip);
-            }
-
-            // if the ping did not succeed and we havent already warned of an outage, send a message to alert server dead
-            if (ping_succeeded == false && ip_list[i].dead == false) {
-                sprintf(message, settings_array[SETTINGS_DIE_STRING_POS], ip_list[i].host, ip_list[i].ip, settings_array[SETTINGS_ID_POS]);
-                puts(message);
-                send_discord_message(webhook_url, message);
-                ip_list[i].dead = true;
-            }
-
-            // if the ping succeeded but we have reported the server as down, send a message to alert server alive
-            else if (ping_succeeded == true && ip_list[i].dead == true) {
-                sprintf(message, settings_array[SETTINGS_ALIVE_STRING_POS], ip_list[i].host, ip_list[i].ip, settings_array[SETTINGS_ID_POS]);
-                puts(message);
-                send_discord_message(webhook_url, message);
-                ip_list[i].dead = false;
-            }
-            sleep(4);
+    // loop through every line in the settings file
+    for (int i = 0;settings_array[i];i++) {
+        char** curr_elem_split = str_split(settings_array[i], '=');
+        // make sure every line has a name and value seperated by =
+        if(!curr_elem_split[1] || curr_elem_split[2]) {
+            printf("ERROR IN %s ON LINE %d\n", argv[1], i+1);
+            return 1;
         }
+
+        if(!strcmp(curr_elem_split[0], "WEBHOOK_URL")) {
+            if(webhook_url) {
+                printf("ERROR IN %s ON LINE %d REDEFINITION OF WEBHOOK_URL\n", argv[1], i+1);
+                return 1;
+            }
+            webhook_url = curr_elem_split[1];
+        } else if(!strcmp(curr_elem_split[0], "PING_ID")) {
+            if(ping_id) {
+                printf("ERROR IN %s ON LINE %d REDEFINITION OF PING_ID\n", argv[1], i+1);
+                return 1;
+            }
+            ping_id = curr_elem_split[1];
+        } else if(!strcmp(curr_elem_split[0], "SERVER")) {
+            char** currServ = str_split(curr_elem_split[1], '@');
+            server_t tmpServer;
+            tmpServer.prevOnline = false;
+            // double NOT is kind of cursed
+            tmpServer.portSpecified = !!strchr(currServ[1], ':');
+            tmpServer.name = currServ[0];
+
+            // if a port has been specifed, split the ip
+            // by : and save the left as ip and the right as
+            // port converted to an int, otherwise, save the
+            // ip and set port to 0
+            if(tmpServer.portSpecified) {
+                char** tmpServerIp = str_split(currServ[1], ':');
+                tmpServer.ip = tmpServerIp[0];
+                tmpServer.port = atoi(tmpServerIp[1]);
+            } else {
+                tmpServer.ip = currServ[1];
+                tmpServer.port = 0;
+            }
+
+
+            servers[elems_in_servers_arr] = tmpServer;
+            elems_in_servers_arr++;
+
+            // make sure servers array isnt overflowing
+            if(elems_in_servers_arr+1>=curr_sizeof_servers) {
+                server_t* servers_old = servers;
+                servers = realloc(servers, (sizeof(server_t)*5+curr_sizeof_servers));
+                curr_sizeof_servers+=5;
+                if(!servers) {
+                    printf("ERROR COULD NOT ALLOCATE %ld BYTES\n", (sizeof(server_t)*5+curr_sizeof_servers));
+                    return 1;
+                }
+                free(servers_old);
+            }
+
+        } else {
+            printf("ERROR IN %s ON LINE %d UNEXPECTED TOKEN\n", argv[1], i+1);
+        }
+
     }
 
-    free(ip_list);
+    // main loop
+    while(1) {
+        for (int i = 0; i < elems_in_servers_arr; i++) {
+            // printf("checking:\nip:%s\nname:%s\nport:%d\nportNum:%d\nalive:%d\n", servers[i].ip, servers[i].name, servers[i].portSpecified, servers[i].port, servers[i].prevOnline);
+
+            bool pingSuccess = false;
+            // attempt socket connect
+            if (servers[i].portSpecified) {
+                pingSuccess = check_ip_port(servers[i].ip, servers[i].port, 5);
+            } else {
+                pingSuccess = ping(servers[i].ip);
+            }
+
+            // server was online last time we checked but isnt now
+            if (!pingSuccess && servers[i].prevOnline) {
+                // printf("server %s died\n", servers[i].name);
+
+                char* tmpMsgPtr = malloc(strlen(discordOfflineMsg)+200);
+                sprintf(tmpMsgPtr, discordOfflineMsg, ping_id, servers[i].name, servers[i].ip, servers[i].port);
+                send_discord_message(webhook_url, tmpMsgPtr);
+                free(tmpMsgPtr);
+
+            // server wasnt online last time we checked but is now
+            } else if (pingSuccess && !servers[i].prevOnline) {
+                // printf("server %s online\n", servers[i].name);
+
+                char* tmpMsgPtr = malloc(strlen(discordOnlineMsg)+200);
+                sprintf(tmpMsgPtr, discordOnlineMsg, ping_id, servers[i].name, servers[i].ip, servers[i].port);
+                puts(tmpMsgPtr);
+                send_discord_message(webhook_url, tmpMsgPtr);
+                free(tmpMsgPtr);
+            }
+
+            servers[i].prevOnline = pingSuccess;
+        }
+        sleep(1);
+    }
+
+    free(settings_file_buf);
+    free(servers);
 
     return 0;
 }

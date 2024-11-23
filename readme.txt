@@ -9,22 +9,17 @@ The program was built for Linux but also likely compiles for most unix based sys
 It was written in C without many protections so exposing your config file to the internet isn't
 safe although with normal use it shouldn't be possible to compromise.
 
-Supports ICMP pinging a host (syntax <host>@192.168.1.4) and "pinging" specific ports (syntax <host>@192.168.1.4:80) seemlessly.
+Supports ICMP pinging a host (syntax <host>@192.168.1.4) and connecting specific ports (syntax <host>@192.168.1.4:80).
 
 Example usage:
-<path-to-exe> settings.txt
+<path-to-exe> settings.cfg
 
-Example settings file:
+Settings file format:
 
-<discord webhook url here><@582273277544759296>~%s@%s is dead %s~%s@%s is alive %s~5~Raspberry pi 5@192.168.4.77~IMac@192.168.4.73~test@255.255.255.254~testssh@255.255.255.254:22~pissh@192.168.4.77:22~
+WEBHOOK_URL=<URL HERE>
+PING_ID=582273277544759296
+SERVER=raspberrypi5@192.168.4.77
+SERVER=searx@192.168.4.77:80
 
-the webhook url is censored here.
-
-The settings file is an array of strings seperated by a '~' symbol, must be terminated with another '~'.
-
-The 1st item is the discord webhook url
-The 2nd item is your discord id surrounded by <@ > to ping you\
-The 3rd item is the string to send when an ip dies, it needs to have 2 "%s"'s in it, the first being the ip name+address and the 2nd being your discord id
-The 4th item is the same as the 3rd but sent when an ip comes back one
-The 5th item is how many ip addresses you are tracking
-The 6th item and up is formatted as <ip name>@<ip address> for each server you want to monitor
+settings file must have no whitespace(lazy parser). WEBHOOK_URL and PING_ID must not be redefined but SERVER gets redefined for 
+each server that you want to add.

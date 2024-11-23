@@ -14,4 +14,4 @@ gcc -c -o build/object/socket_ping.o src/socket_ping.c -lcurl
 gcc build/object/*.o -o build/main -lcurl
 
 # run
-build/main settings.txt
+build/main settings.cfg
