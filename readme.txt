@@ -4,6 +4,9 @@ The program regularly pings every server in your servers list and if one times o
 then it sends a ping over your discord websocket notifying you with the ip and a custom nickname. It sends another ping when the
 server comes back online.
 
+NOTE!: you may have to run sudo setcap cap_net_raw=+ep ./build/main for the program to not require root privelages.
+the program makes raw icmp packets which requires superuser on some systems.
+
 The program was built for Linux but also likely compiles for most unix based systems.
 
 It was written in C without many protections so exposing your config file to the internet isn't
