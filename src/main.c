@@ -7,12 +7,12 @@
 #include <stdbool.h>
 #include <assert.h>
 
-#include "discord.h"
-#include "ping.h"
-#include "strsplit.h"
-#include "define.h"
-#include "settings_file.h"
-#include "socket_ping.h"
+#include <discord.h>
+#include <ping.h>
+#include <strsplit.h>
+#include <define.h>
+#include <settings_file.h>
+#include <socket_ping.h>
 
 int check_args(int argc, char *argv[]) {
     if (argc == 1) {

@@ -1,3 +1,4 @@
+#include <ping.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -9,7 +10,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <stdbool.h>
-#include "ping.h"
+
 
 // Function to calculate checksum
 unsigned short checksum(void *b, int len) {

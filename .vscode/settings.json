@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "discord.h": "c",
+        "ping.h": "c",
+        "strsplit.h": "c",
+        "define.h": "c",
+        "socket_ping.h": "c",
+        "settings_file.h": "c",
+        "string.h": "c",
+        "inet.h": "c",
+        "assert.h": "c"
+    }
+}

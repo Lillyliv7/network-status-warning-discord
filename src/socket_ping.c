@@ -1,3 +1,5 @@
+#include <socket_ping.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
